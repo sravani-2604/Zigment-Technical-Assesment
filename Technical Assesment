@@ -1,0 +1,237 @@
+import React, { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+
+
+interface FieldOption {
+  value: string;
+  label: string;
+}
+
+interface ValidationRule {
+  pattern: string;
+  message: string;
+}
+
+interface FormField {
+  id: string;
+  type: "text" | "email" | "select" | "radio" | "textarea";
+  label: string;
+  required: boolean;
+  placeholder?: string;
+  validation?: ValidationRule;
+  options?: FieldOption[];
+}
+
+interface FormSchema {
+  formTitle: string;
+  formDescription: string;
+  fields: FormField[];
+}
+
+const JsonEditor = ({ value, onChange, error }) => (
+  <div className="h-full">
+    <div className="mb-2 flex items-center justify-between">
+      <h2 className="text-lg font-semibold">JSON Schema Editor</h2>
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle className="w-4 h-4 mr-1" />
+          Invalid JSON
+        </div>
+      )}
+    </div>
+    <textarea
+      className={`w-full h-[calc(100vh-200px)] p-4 font-mono text-sm border rounded-lg 
+        ${error ? "border-red-500" : "border-gray-300"} 
+        focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+      value={value}
+      onChange={onChange}
+      placeholder="Enter your form schema here..."
+    />
+  </div>
+);
+
+
+const FormGenerator = ({ schema, onSubmit }) => {
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm();
+  const [submitted, setSubmitted] = useState(false);
+
+  const onSubmitHandler = (data) => {
+    console.log("Form submitted:", data);
+    setSubmitted(true);
+    onSubmit?.(data);
+    setTimeout(() => setSubmitted(false), 3000);
+  };
+
+  return (
+    <div className="h-full">
+      <h1 className="text-2xl font-bold mb-2">{schema.formTitle}</h1>
+      <p className="text-gray-600 mb-6">{schema.formDescription}</p>
+
+      <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-6">
+        {schema.fields.map((field) => (
+          <div key={field.id} className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              {field.label}
+              {field.required && <span className="text-red-500">*</span>}
+            </label>
+
+            <Controller
+              name={field.id}
+              control={control}
+              rules={{
+                required: field.required && "This field is required",
+                pattern: field.validation && {
+                  value: new RegExp(field.validation.pattern),
+                  message: field.validation.message,
+                },
+              }}
+              render={({ field: { onChange, value } }) => {
+                switch (field.type) {
+                  case "textarea":
+                    return (
+                      <textarea
+                        className="w-full p-2 border rounded-md"
+                        placeholder={field.placeholder}
+                        onChange={onChange}
+                        value={value || ""}
+                      />
+                    );
+
+                  case "select":
+                    return (
+                      <select
+                        className="w-full p-2 border rounded-md"
+                        onChange={onChange}
+                        value={value || ""}
+                      >
+                        <option value="">Select an option</option>
+                        {field.options?.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    );
+
+                  case "radio":
+                    return (
+                      <div className="space-y-2">
+                        {field.options?.map((option) => (
+                          <div key={option.value} className="flex items-center">
+                            <input
+                              type="radio"
+                              value={option.value}
+                              onChange={onChange}
+                              checked={value === option.value}
+                              className="mr-2"
+                            />
+                            <span>{option.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+
+                  default:
+                    return (
+                      <input
+                        type={field.type}
+                        className="w-full p-2 border rounded-md"
+                        placeholder={field.placeholder}
+                        onChange={onChange}
+                        value={value || ""}
+                      />
+                    );
+                }
+              }}
+            />
+
+            {errors[field.id] && (
+              <p className="text-red-500 text-sm">
+                {errors[field.id].message as string}
+              </p>
+            )}
+          </div>
+        ))}
+
+        <div className="flex items-center space-x-4">
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 
+              transition-colors duration-200"
+          >
+            Submit
+          </button>
+
+          {submitted && (
+            <div className="flex items-center text-green-500">
+              <CheckCircle2 className="w-5 h-5 mr-2" />
+              Form submitted successfully!
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+};
+
+
+const DynamicFormGenerator = () => {
+  const [jsonInput, setJsonInput] = useState("");
+  const [parsedSchema, setParsedSchema] = useState<FormSchema | null>(null);
+  const [jsonError, setJsonError] = useState(false);
+
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setJsonInput(newValue);
+
+    try {
+      const parsed = JSON.parse(newValue);
+      setParsedSchema(parsed);
+      setJsonError(false);
+    } catch (error) {
+      setJsonError(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <JsonEditor
+              value={jsonInput}
+              onChange={handleJsonChange}
+              error={jsonError}
+            />
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            {parsedSchema ? (
+              <FormGenerator
+                schema={parsedSchema}
+                onSubmit={(data) => console.log("Form submitted:", data)}
+              />
+            ) : (
+              <div className="text-center text-gray-500 mt-8">
+                {jsonError ? (
+                  <p>
+                    Please fix the JSON syntax errors to see the form preview
+                  </p>
+                ) : (
+                  <p>Enter a valid form schema to see the preview</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DynamicFormGenerator;
